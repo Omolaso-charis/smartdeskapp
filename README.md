@@ -1,6 +1,13 @@
-# SmartDesk demo app (Bloom Hair Studio)
+# SmartDesk demo app
 
-An installable web app (PWA) demo of SmartDesk: an AI assistant for small business owners that handles bookings, calendar blocking, to-dos and social media post drafts.
+**Your smart assistant for the day-to-day.** Book, block, plan and post, in one chat.
+
+An installable web app (PWA) demo with two modes, chosen on first launch and switchable anytime:
+
+- **Business mode** (sample: Bloom Hair Studio): customer bookings, booking page, supplier and content events, business posts.
+- **Personal mode** (sample: Tolu): events, focus time, personal tasks and personal posts. No booking page or customer fields.
+
+Each mode keeps its own calendar, tasks and posts on the device.
 
 ## Files
 
@@ -9,7 +16,7 @@ An installable web app (PWA) demo of SmartDesk: an AI assistant for small busine
 | `index.html` | The whole app (screens, styles and logic) |
 | `manifest.json` | App name, colours and icons, so phones can install it |
 | `sw.js` | Service worker: lets the app open offline after the first visit |
-| `favicon.svg`, `icon-*.png` | SmartDesk logo (desk and spark) as browser and home-screen icons |
+| `favicon.svg`, `favicon-32.png`, `icon-*.png` | SmartDesk logo (white desk and coral spark on teal) as browser and home-screen icons |
 
 ## Put it online (choose one)
 
@@ -53,8 +60,12 @@ The app must be served over **HTTPS** for installing and offline use to work.
 2. Click the install icon at the right of the address bar, then **Install**.
 
 ## Good to know
-- **Data stays on the device.** Each phone keeps its own sample data. Use Settings → Reset demo data before presenting.
-- **Assistant mode.** Live AI only works when the app is opened through the Claude artifact link. The installed app uses the built-in offline assistant, which handles: "Block Friday morning for admin", "Book a silk press for Funmi on Wednesday at 2pm", "Draft an Instagram post about our new colour treatment", "Remind me to reorder shampoo".
+- **Switching modes.** Tap the mode pill on the home card, or go to Settings → Mode.
+- **Data stays on the device.** Each phone keeps its own sample data for each mode. Use Settings → Reset demo data before presenting.
+- **Assistant.** Live AI only works when the app is opened through the Claude artifact link. The installed app uses the built-in offline assistant, which handles the suggestion buttons in the chat:
+  - Business: "Block Friday morning for admin", "Book a silk press for Funmi on Wednesday at 2pm", "Draft an Instagram post about our new colour treatment", "Remind me to reorder shampoo".
+  - Personal: "Block 2pm tomorrow for focus time", "Add lunch with Bisi on Friday at 1pm", "Draft an Instagram post about my weekend", "Remind me to call my mum".
+- **First screen again.** To see the mode picker again on a device, clear the site data in the browser settings.
 - **Previews.** Calendar sync and social posting are simulated and do not connect to real accounts.
 - **Updating.** Replace the files on your host. Users get the update the next time they open the app online.
 - **App stores.** Publishing to the App Store or Google Play needs developer accounts and a wrapper such as PWABuilder or Capacitor.

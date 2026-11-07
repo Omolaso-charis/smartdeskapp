@@ -1,7 +1,7 @@
 {
-  "name": "SmartDesk – Bloom Hair Studio",
+  "name": "SmartDesk",
   "short_name": "SmartDesk",
-  "description": "AI assistant for bookings, calendar blocking, tasks and social posts for small business owners (demo).",
+  "description": "Your smart assistant for the day-to-day: book, block, plan and post, in one chat. Business and Personal modes (demo).",
   "id": "./",
   "start_url": "./index.html",
   "scope": "./",
