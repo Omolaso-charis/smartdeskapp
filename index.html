@@ -410,6 +410,7 @@ const MODES = {
 const KMODE = 'smartdesk-mode', KDATA = m => 'smartdesk-v3-' + m;
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
 function loadData(m){ try{ const s = lsGet(KDATA(m)); if (s) return JSON.parse(s); }catch(e){} return MODES[m].seed(); }
 
 let mode = MODES[lsGet(KMODE)] ? lsGet(KMODE) : null;
@@ -708,9 +709,11 @@ function settings(){
   ${mode==='business' ? `<div class="card"><div class="row-head"><h3>Customer booking page</h3>${chip('Preview',{bg:'#FDE7E3',fg:'#B53F2C'})}</div>
     <p class="muted" style="margin:6px 0 12px">What customers see when they book online.</p>
     <button class="btn soft block press" data-act="sheet-booking" data-mode="customer">${I('store',18)} Open booking page</button></div>` : ''}
+  <div class="card"><h3>Welcome screen</h3><p class="muted" style="margin:6px 0 12px">Go back to the first screen, where you choose Business or Personal. It will also show the next time the app opens. Your data in both modes is kept.</p>
+    <button class="btn soft block press" data-act="show-welcome">${I('home',18)} Show welcome screen</button></div>
   <div class="card"><h3>Demo</h3><p class="muted" style="margin:6px 0 12px">Sample data for demonstration. Calendar sync and posting are previews and do not connect to real accounts. Data is saved on this device only.</p>
     <button class="btn soft block press" data-act="reset">${I('refresh',18)} Reset ${M.label.toLowerCase()} demo data</button></div>
-  <p class="muted" style="text-align:center">SmartDesk demo · v3</p>`;
+  <p class="muted" style="text-align:center">SmartDesk demo · v3.1</p>`;
 }
 
 const VIEWS = {welcome, home, calendar, chat:chatView, tasks, posts:postsView, settings};
@@ -834,6 +837,7 @@ async function act(name, ds){
       setMode(ds.m); return toast(`${M.label} mode`);
     }
     case 'sheet-mode': return openSheet({type:'mode'});
+    case 'show-welcome': { save(); mode = null; lsDel(KMODE); view = 'welcome'; render(); $('#screen').scrollTop = 0; return; }
     case 'send': return send();
     case 'suggest': return send(ds.t);
     case 'plan-ok': {

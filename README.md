@@ -65,7 +65,7 @@ The app must be served over **HTTPS** for installing and offline use to work.
 - **Assistant.** Live AI only works when the app is opened through the Claude artifact link. The installed app uses the built-in offline assistant, which handles the suggestion buttons in the chat:
   - Business: "Block Friday morning for admin", "Book a silk press for Funmi on Wednesday at 2pm", "Draft an Instagram post about our new colour treatment", "Remind me to reorder shampoo".
   - Personal: "Block 2pm tomorrow for focus time", "Add lunch with Bisi on Friday at 1pm", "Draft an Instagram post about my weekend", "Remind me to call my mum".
-- **First screen again.** To see the mode picker again on a device, clear the site data in the browser settings.
+- **First screen again.** Go to Settings → Show welcome screen. The first screen then also shows the next time the app opens. Your data in both modes is kept.
 - **Previews.** Calendar sync and social posting are simulated and do not connect to real accounts.
 - **Updating.** Replace the files on your host. Users get the update the next time they open the app online.
 - **App stores.** Publishing to the App Store or Google Play needs developer accounts and a wrapper such as PWABuilder or Capacitor.
