@@ -1,16 +1,17 @@
 {
   "name": "SmartDesk – Bloom Hair Studio",
   "short_name": "SmartDesk",
-  "description": "AI assistant for scheduling, calendar blocking, to-dos and social posts for small business owners (demo).",
+  "description": "AI assistant for bookings, calendar blocking, tasks and social posts for small business owners (demo).",
+  "id": "./",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f4efe8",
-  "theme_color": "#2f6f5e",
+  "background_color": "#F5F3EF",
+  "theme_color": "#0F766E",
   "icons": [
     {"src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
     {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
-    {"src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+    {"src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
   ]
 }
