@@ -87,6 +87,9 @@ h3{font-size:15px;font-weight:700;margin:0}
 .day.on{background:var(--primary);color:#E6F4F1}
 .day.on b{color:#fff}
 .day .dot{position:absolute;bottom:6px;left:50%;width:5px;height:5px;margin-left:-2.5px;border-radius:50%;background:var(--accent)}
+.day.today{box-shadow:0 0 0 2px var(--accent),var(--shadow)}
+.day .tg{display:block;font-style:normal;font-size:9px;font-weight:700;line-height:1.2;color:var(--accent);text-transform:uppercase;letter-spacing:.04em}
+.day.on .tg{color:#E6F4F1}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:12px;color:var(--muted);margin:6px 0 4px}
 .legend span::before{content:'';display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;background:var(--c)}
 
@@ -175,11 +178,13 @@ textarea.field{min-height:84px;resize:vertical}
 
 .toast{position:absolute;left:50%;bottom:96px;z-index:40;transform:translate(-50%,20px);opacity:0;background:#14201E;color:#fff;font-size:13.5px;font-weight:600;padding:11px 16px;border-radius:14px;display:flex;align-items:center;gap:8px;white-space:nowrap;max-width:90%;transition:all .25s;pointer-events:none}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+.ev.past{opacity:.55}
+.toast button{pointer-events:auto;background:none;border:0;color:#7FD6C9;font-weight:800;font-size:13.5px;margin-left:10px;padding:4px 6px;font-family:inherit}
 .toast svg{color:#5EEAD4}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 
 .askbar{flex:none;position:relative;z-index:11;display:flex;gap:8px;align-items:center;padding:8px 14px 10px;background:var(--bg)}
-#mic.on{background:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(249,115,98,.25)}
+.mic.on{background:var(--accent);color:#fff;box-shadow:0 0 0 4px rgba(249,115,98,.25)}
 .askin{flex:1;min-width:0;border:0;background:var(--card);box-shadow:var(--shadow);border-radius:16px;padding:13px 15px;outline:none}
 .avatar{flex:none;width:40px;height:40px;border-radius:50%;background:var(--primary);color:#fff;font-weight:800;font-size:16px;display:flex;align-items:center;justify-content:center;box-shadow:var(--shadow)}
 .days .day{flex:1 1 0;min-width:0;width:auto;padding:10px 0}
@@ -215,12 +220,18 @@ textarea.field{min-height:84px;resize:vertical}
 <script>
 /* ---------- Constants ---------- */
 const DAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
-const DATES = {Mon:'9',Tue:'10',Wed:'11',Thu:'12',Fri:'13',Sat:'14',Sun:'15'};
 const FULL = {Mon:'Monday',Tue:'Tuesday',Wed:'Wednesday',Thu:'Thursday',Fri:'Friday',Sat:'Saturday',Sun:'Sunday'};
-const ISO_OF = {Mon:'2026-11-09',Tue:'2026-11-10',Wed:'2026-11-11',Thu:'2026-11-12',Fri:'2026-11-13',Sat:'2026-11-14',Sun:'2026-11-15'};
+const localIso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const TODAY = localIso(new Date());
+const TOMORROW = (() => { const d = new Date(); d.setDate(d.getDate()+1); return localIso(d); })();
+const thisMonday = () => { const d = new Date(); d.setDate(d.getDate() - ((d.getDay()+6)%7)); return localIso(d); };
+const WEEK_START = thisMonday();
+const ISO_OF = (() => { const o = {}; ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].forEach((k,i) => { const d = new Date(WEEK_START+'T00:00:00'); d.setDate(d.getDate()+i); o[k] = localIso(d); }); return o; })();
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const WDAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
-const TODAY = '2026-11-09', TOMORROW = '2026-11-10', NOW = '09:30', BIZ = 'Bloom Hair Studio';
+const nowHHMM = () => { const d = new Date(); return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); };
+const greetWord = () => { const h = new Date().getHours(); return h < 12 ? 'Good morning' : h < 17 ? 'Good afternoon' : 'Good evening'; };
+const BIZ = 'Bloom Hair Studio';
 const isIso = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s||'')) && !isNaN(new Date(s+'T00:00:00Z'));
 function addDays(iso, n){ const d = new Date(iso+'T00:00:00Z'); d.setUTCDate(d.getUTCDate()+n); return d.toISOString().slice(0,10); }
 function wIdx(iso){ return (new Date(iso+'T00:00:00Z').getUTCDay()+6)%7; }
@@ -229,7 +240,10 @@ const dNum = iso => String(parseInt(iso.slice(8,10),10));
 const mon = iso => MONTHS[parseInt(iso.slice(5,7),10)-1];
 const fullDate = iso => `${dName(iso)} ${dNum(iso)} ${mon(iso)}`;
 const weekOf = iso => Array.from({length:7}, (_,i) => addDays(iso, i - wIdx(iso)));
-const SLOTS = ['07:00','08:00','09:00','10:00','11:00','12:00','13:00','14:00','15:00','16:00','17:00','18:00','19:00','20:00'];
+const SLOTS = Array.from({length:24}, (_,h) => String(h).padStart(2,'0')+':00');
+const TIME_OK = /^([01]\d|2[0-3]):[0-5]\d$/;
+const endOf = e => (e.end && TIME_OK.test(e.end) && e.end > e.time) ? e.end : e.time;
+const timeLabel = e => (e.end && TIME_OK.test(e.end) && e.end > e.time) ? `${e.time}–${e.end}` : e.time;
 const PLAT = {
   instagram:{n:'Instagram',lim:2200,bg:'#FCE7F1',fg:'#BE185D'},
   facebook:{n:'Facebook',lim:1500,bg:'#E8F0FE',fg:'#1D4ED8'},
@@ -297,7 +311,10 @@ const TPL = {
 };
 
 /* ---------- Storage (per viewer, this browser only) ---------- */
-const KUSER = 'smartdesk-user', KSPACES = 'smartdesk-spaces', KDATA = 'smartdesk-v4';
+const KUSER = 'smartdesk-user', KSPACES = 'smartdesk-spaces', KDATA = 'smartdesk-v4', KLABELS = 'smartdesk-labels';
+{ const L = lsJSON(KLABELS) || {}; ORDER.forEach(k => { if (L[k]) SPACES[k].label = L[k]; }); }
+const escRe = x => x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+const spaceWordRe = () => new RegExp('\\b(' + ORDER.map(k => escRe(SPACES[k].label.toLowerCase())).join('|') + ')\\b','ig');
 function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
 function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
 function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
@@ -309,6 +326,7 @@ function seedAll(){
   const cl = (space, title, items) => ({id:uid(), space, title, items});
   const pt = (space, platform, caption, when, status) => ({id:uid(), space, platform, caption, when, status});
   return {
+    weekStart: WEEK_START,
     events:[
       ev('business','Mon','10:00','Supplier call: colour products','Supplier'),
       ev('business','Mon','15:00','Braids – Amaka','Appointment'),
@@ -359,6 +377,98 @@ spaces = Array.isArray(spaces) ? ORDER.filter(s => spaces.includes(s)) : null;
 if (spaces && !spaces.length) spaces = null;
 let S = lsJSON(KDATA) || seedAll();
 S.events.forEach(e => { if (ISO_OF[e.day]) e.day = ISO_OF[e.day]; });
+if (S.weekStart && S.weekStart !== WEEK_START) {
+  const shift = Math.round((new Date(WEEK_START+'T00:00:00') - new Date(S.weekStart+'T00:00:00')) / 86400000);
+  S.events.forEach(e => { if (isIso(e.day)) e.day = addDays(e.day, shift); });
+}
+S.weekStart = WEEK_START;
+S.trash = S.trash || [];
+function pruneBin(){ const cut = Date.now() - 7*24*60*60*1000; S.trash = S.trash.filter(b => b.at >= cut); }
+pruneBin();
+const BIN_NAME = {section:'Section', item:'Task in section', todo:'To-do', event:'Calendar item', post:'Post'};
+function bin(kind, data, label){
+  const b = {id:uid(), kind, at:Date.now(), label:String(label||'Item').slice(0,60), data}; lastBin = b.id;
+  S.trash.unshift(b); pruneBin(); save(); return b.id;
+}
+const REMIND = [['none','No reminder'],['0','At the time'],['5','5 min before'],['10','10 min before'],['30','30 min before'],['60','1 hour before']];
+const remindPills = (cur, k) => `<div class="pills">${REMIND.map(([v,l]) => `<button class="pill ${String(cur ?? 'none')===v?'on':''}" data-act="sf" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
+const remindVal = v => (v===undefined || v===null || v==='none' || v==='') ? null : +v;
+const remindText = m => m==null ? '' : (m===0 ? 'At time' : (m===60 ? '1 hour before' : `${m} min before`));
+function whenFields(s){
+  return `<span class="lbl">Date (optional)</span><input class="field" type="date" data-sf="day" value="${s.day||''}">
+    <span class="lbl">Time (optional)</span><input class="field" type="time" data-sf="time" value="${s.time||''}">
+    <span class="lbl">Reminder</span>${remindPills(s.remind,'remind')}`;
+}
+function whenOf(s){
+  const day = s.day ? s.day : null, time = s.time || null, remind = remindVal(s.remind);
+  if (day && !isIso(day)) return {err:'Pick a valid date.'};
+  if (time && !/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) return {err:'Pick a valid time.'};
+  if (remind !== null && !(day && time)) return {err:'A reminder needs a date and time.'};
+  return {day, time, remind};
+}
+const dueText = t => t.day ? `${dName(t.day).slice(0,3)} ${dNum(t.day)} ${mon(t.day)}${t.time ? ' '+t.time : ''}` : (t.due || '');
+let lastBin = null;
+function toastUndo(msg, binId){
+  const el = $('#toast');
+  el.innerHTML = `<span>${esc(msg)}</span><button data-act="restore" data-id="${binId}" aria-label="Undo">Undo</button>`;
+  el.classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => el.classList.remove('show'), 10000);
+}
+const KFIRED = 'smartdesk-fired';
+function reminderList(){
+  const out = [];
+  S.events.forEach(e => { if (isOn(e.space) && e.remind!=null && e.day && e.time) out.push({key:'e:'+e.id, label:e.title, day:e.day, time:e.time, mins:e.remind}); });
+  S.todos.forEach(t => { if (isOn(t.space) && !t.done && t.remind!=null && t.day && t.time) out.push({key:'t:'+t.id, label:t.text, day:t.day, time:t.time, mins:t.remind}); });
+  S.checklists.forEach(l => { if (isOn(l.space)) l.items.forEach((it,i) => { if (!it.d && it.remind!=null && it.day && it.time) out.push({key:'i:'+l.id+':'+i+':'+it.t, label:it.t, day:it.day, time:it.time, mins:it.remind}); }); });
+  return out;
+}
+function announce(r){
+  const msg = `${r.label}${r.mins ? ', in ' + r.mins + ' minutes' : ', now'}`;
+  toast('Reminder: ' + msg);
+  speak('Reminder: ' + msg);
+  if ('Notification' in window && Notification.permission === 'granted'){ try { new Notification('SmartDesk reminder', {body: msg}); } catch(e){} }
+}
+function checkReminders(){
+  if (!user) return;
+  const now = Date.now();
+  let fired = lsJSON(KFIRED) || {};
+  if (Object.keys(fired).length > 300) fired = {};
+  let changed = false;
+  reminderList().forEach(r => {
+    const at = new Date(r.day+'T'+r.time+':00').getTime();
+    const k = r.key+'|'+r.day+'|'+r.time+'|'+r.mins;
+    if (now >= at - r.mins*60000 && now < at + 60000 && !fired[k]){ fired[k] = true; changed = true; announce(r); }
+  });
+  if (changed) lsSet(KFIRED, JSON.stringify(fired));
+}
+function restoreBin(id){
+  const b = S.trash.find(x => x.id === id); if (!b) return;
+  if (b.kind === 'todo') S.todos.push(b.data);
+  if (b.kind === 'event') S.events.push(b.data);
+  if (b.kind === 'post') S.posts.push(b.data);
+  if (b.kind === 'section') S.checklists.push(b.data);
+  if (b.kind === 'item'){
+    let l = S.checklists.find(x => x.id === b.data.section.id);
+    if (!l){ l = {...b.data.section, items:[]}; S.checklists.push(l); }
+    l.items.splice(Math.min(b.data.index, l.items.length), 0, b.data.item);
+  }
+  S.trash = S.trash.filter(x => x.id !== id); save();
+  $('#toast').classList.remove('show');
+  render(); toast('Restored');
+}
+function remindCard(){
+  const perm = ('Notification' in window) ? Notification.permission : 'unsupported';
+  const note = perm === 'granted' ? 'Reminders show on screen, are spoken aloud, and also appear as phone notifications while the app is open.'
+    : perm === 'denied' ? 'Notifications are blocked in your browser settings. Reminders still show and are spoken while the app is open.'
+    : perm === 'unsupported' ? 'Reminders show on screen and are spoken aloud while the app is open.'
+    : 'Reminders show on screen and are spoken aloud while the app is open. Allow notifications so they can also reach you on the phone.';
+  return `<div class="card"><h3>Reminders</h3><p class="muted" style="margin:6px 0 10px">${note}</p>${perm === 'default' ? '<button class="btn sm press" data-act="allow-notify">Allow notifications</button>' : ''}</div>`;
+}
+function binCard(){
+  if (!S.trash.length) return `<div class="card"><h3>Recently deleted</h3><p class="muted" style="margin-top:6px">Nothing deleted in the last 7 days.</p></div>`;
+  return `<div class="card"><h3>Recently deleted</h3><p class="muted" style="margin:6px 0 8px">Kept for 7 days, then removed for good.</p>${S.trash.map(b => `<div class="task"><span class="t">${esc(b.label)}<div class="muted" style="font-size:12px">${BIN_NAME[b.kind]} · deleted ${new Date(b.at).toLocaleDateString('en-GB',{day:'numeric',month:'short'})}</div></span><button class="btn sm soft press" data-act="restore" data-id="${b.id}">Restore</button></div>`).join('')}</div>`;
+}
 const LENS = {cal:'all', tasks:'all', posts:'all'};
 let calDay = TODAY, taskFilter = 'all', postFilter = 'all', sheet = null, busy = false;
 let welcomeSel = spaces ? spaces.slice() : [];
@@ -387,12 +497,14 @@ function dayItems(day, w){
   });
 }
 /* Other items on the same day and time, across active spaces */
-function clashes(day, time){
+function clashes(day, time, end){
   if (!time) return [];
-  return S.events.filter(e => isOn(e.space) && e.day === day && e.time === time);
+  const pEnd = (end && TIME_OK.test(end) && end > time) ? end : time;
+  const overlaps = e => e.time === time || (time < endOf(e) && e.time < pEnd);
+  return S.events.filter(e => isOn(e.space) && e.day === day && overlaps(e));
 }
-function conflictNote(day, time){
-  const hits = clashes(day, time);
+function conflictNote(day, time, end){
+  const hits = clashes(day, time, end);
   if (!hits.length) return '';
   return `<div class="warn">Heads up: ${hits.map(h => `${esc(h.title)} (${nm(h.space)})`).join(', ')} at ${time}. You can still add this.</div>`;
 }
@@ -406,10 +518,27 @@ async function getSample(){
 }
 getSample().then(f => { aiState = f ? 'live' : 'offline'; if (view==='chat') render(); });
 
-const ALLOWED_TYPES = ['create_block','create_appointment','create_todo','create_post','create_section','add_to_section'];
+const ALLOWED_TYPES = ['create_block','create_appointment','create_todo','create_post','create_section','add_to_section','edit_item','delete_item','done_item','edit_section','delete_section'];
 function cleanAction(a){
   if (!a || typeof a!=='object' || !ALLOWED_TYPES.includes(a.type)) return null;
   const space = (SPACES[a.space] && isOn(a.space)) ? a.space : defSpace();
+  if (['edit_item','delete_item','done_item'].includes(a.type)){
+    if (!['event','todo','item'].includes(a.kind) || !a.id) return null;
+    const out = {type:a.type, kind:a.kind, id:String(a.id), index: a.kind==='item' ? +a.index : undefined, label:String(a.label||'').slice(0,80)};
+    if (a.type==='edit_item'){
+      if (a.title) out.title = String(a.title).trim().slice(0,60);
+      if (a.day){ if (!isIso(a.day)) return null; out.day = a.day; }
+      if (a.time){ if (!TIME_OK.test(a.time)) return null; out.time = a.time; if (a.end && TIME_OK.test(a.end) && a.end > a.time) out.end = a.end; }
+      if (a.remind !== undefined) out.remind = a.remind===null ? null : +a.remind;
+    }
+    return out;
+  }
+  if (['edit_section','delete_section'].includes(a.type)){
+    if (!a.id) return null;
+    const out = {type:a.type, id:String(a.id), label:String(a.label||'').slice(0,40)};
+    if (a.type==='edit_section'){ const t = String(a.title||'').trim().slice(0,40); if (!t) return null; out.title = t; }
+    return out;
+  }
   if (a.type==='create_todo'){ const text = String(a.text||'').trim().slice(0,120); return text ? {type:a.type,space,text} : null; }
   if (a.type==='create_section'){ const title = String(a.title||'').trim().slice(0,40); return title ? {type:a.type,space,title,recurring:!!a.recurring} : null; }
   if (a.type==='add_to_section'){ const text = String(a.text||'').trim().slice(0,120), section = String(a.section||'').trim().slice(0,40); return text && section ? {type:a.type,space,text,section} : null; }
@@ -419,21 +548,27 @@ function cleanAction(a){
     const platform = SPACES[sp].platforms.includes(a.platform) ? a.platform : SPACES[sp].platforms[0];
     return {type:a.type,space:sp,platform,day:a.day,note:String(a.note||'').slice(0,200),caption:String(a.caption||'').slice(0,2200)};
   }
-  if (!isIso(a.day) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(String(a.time||''))) return null;
-  return {type:a.type,space,day:a.day,time:a.time,title:String(a.title||'Untitled').slice(0,60)};
+  if (!isIso(a.day) || !TIME_OK.test(String(a.time||''))) return null;
+  const end = (a.end && TIME_OK.test(a.end) && a.end > a.time) ? a.end : undefined;
+  return {type:a.type,space,day:a.day,time:a.time,end,title:String(a.title||'Untitled').slice(0,60)};
 }
 async function askLive(text){
   const sample = await getSample();
   if (!sample){ aiState='offline'; return {r:parse(text),live:false}; }
   const prompt = [
     `You are SmartDesk's assistant for ${firstName()}. The spaces they manage are: ${active().map(nm).join(', ')}. Business is ${BIZ}, a small hair salon in Lagos, Nigeria. Prices are in naira.`,
-    'Today is Monday 9 November 2026 (2026-11-09), 09:30. Dates use YYYY-MM-DD and can be any date.',
+    `Today is ${fullDate(TODAY)} ${TODAY.slice(0,4)} (${TODAY}), ${nowHHMM()}. Dates use YYYY-MM-DD and can be any date.`,
     'Reply with one JSON object and nothing else: {"reply":"one short friendly sentence","actions":[...]}',
-    'Every action has a "space" field: personal, business or work. Use only spaces the user manages.',
+    'Every action has a "space" field: ' + ORDER.map(k => k + ' (' + SPACES[k].label + ')').join(', ') + '. Use only spaces the user manages.',
     '{"type":"create_block","space":"...","day":"YYYY-MM-DD","time":"HH:MM","title":"short title"} for focus, admin, rest or other blocked time',
     '{"type":"create_appointment","space":"...","day":"...","time":"HH:MM","title":"short title"} for events, meetings and customer appointments (business is for customer bookings)',
     '{"type":"create_todo","space":"...","text":"task"}',
     '{"type":"create_section","space":"...","title":"section name","recurring":true or false}',
+    '{"type":"edit_item","kind":"event|todo|item","id":"id from the list","index":0,"title":"optional","day":"YYYY-MM-DD optional","time":"HH:MM optional","remind":minutes before or null}',
+    '{"type":"delete_item","kind":"event|todo|item","id":"id from the list","index":0}',
+    '{"type":"done_item","kind":"todo|item","id":"id from the list","index":0}',
+    '{"type":"edit_section","id":"id from the list","title":"new name"}',
+    '{"type":"delete_section","id":"id from the list"}',
     '{"type":"add_to_section","space":"...","section":"section name","text":"task"}',
     `{"type":"create_post","space":"personal|business","platform":"instagram|facebook|whatsapp|gbp (gbp only for business)","day":"...","note":"topic","caption":"ready-to-post caption suited to the platform"}`,
     'Morning means 09:00, afternoon 14:00, evening 18:00. Use an empty actions array if the request is unclear.',
@@ -467,15 +602,15 @@ function stripWhen(s){
   return s.replace(/\b(on\s+)?(mon|tue|wed|thu|fri|sat|sun)[a-z]*\b/ig,'')
     .replace(/\b(today|tomorrow)\b/ig,'')
     .replace(/\b(in the\s+)?(morning|afternoon|evening)\b/ig,'')
-    .replace(/\b(personal|business|work)\b/ig,'')
+    .replace(spaceWordRe(),'')
     .replace(/\b\d{1,2}(st|nd|rd|th)?\s+(nov|november|dec|december)\b/ig,'')
+    .replace(RANGE_G, m => (parseRange(m)||{}).end ? '' : m)
+    .replace(/\b(at\s+)?\d{1,2}:\d{2}\b/ig,'')
     .replace(/\b(at\s+)?\d{1,2}(:\d{2})?\s*(am|pm)\b/ig,'')
     .replace(/\s+/g,' ').trim();
 }
 function guessSpace(t){
-  if (/\bpersonal\b/.test(t) && isOn('personal')) return 'personal';
-  if (/\bbusiness\b/.test(t) && isOn('business')) return 'business';
-  if (/\bwork\b/.test(t) && isOn('work')) return 'work';
+  for (const k of ORDER){ if (isOn(k) && new RegExp('\\b' + escRe(SPACES[k].label.toLowerCase()) + '\\b').test(t)) return k; }
   if (isOn('business') && /\b(customer|client|clients|supplier|stock|salon|shop|booking|trim|braids|silk|colour|consult|amaka|funmi|ngozi)\b/.test(t)) return 'business';
   if (isOn('work') && /\b(meeting|team|project|stand-?up|office|manager|deadline)\b/.test(t)) return 'work';
   if (isOn('personal') && /\b(gym|dentist|lunch|dinner|family|mum|birthday|focus|rest|errands|bisi|kemi)\b/.test(t)) return 'personal';
@@ -496,13 +631,13 @@ function resolveDay(t){
 }
 const isQuestion = t => /\b(what|whats|what's|anything|am i|is there|are there|show|free|busy|blocked|appointments?|do i have|any)\b/.test(t)
   && !/\b(block|book|add|create|remind|draft|post|caption|put)\b/.test(t);
-function answerQuery(day, time, hasTime){
+function answerQuery(day, time, hasTime, end){
   const when = fullDate(day);
   if (hasTime){
-    const hits = clashes(day, time);
+    const hits = clashes(day, time, end);
     const reply = hits.length
-      ? `You're busy at ${time} on ${when}: ${hits.map(h => `${h.title} (${nm(h.space)})`).join(', ')}.`
-      : `You're free at ${time} on ${when}.`;
+      ? `You're busy at ${timeLabel({time,end})} on ${when}: ${hits.map(h => `${h.title} (${nm(h.space)})`).join(', ')}.`
+      : `You're free at ${timeLabel({time,end})} on ${when}.`;
     return {reply, actions:[]};
   }
   const items = S.events.filter(e => isOn(e.space) && e.day === day).sort(byTime);
@@ -510,7 +645,7 @@ function answerQuery(day, time, hasTime){
   return {reply:`On ${when} you have ${items.length}: ` + items.map(e => `${e.time} ${e.title} (${nm(e.space)})`).join('; ') + '.', actions:[]};
 }
 function cleanName(x){
-  return cap(String(x||'').replace(/\b(personal|business|work|recurring|one-?off|section)\b/ig,'').replace(/\s+/g,' ').replace(/\s+(for|to|in|on|into)\s*$/i,'').trim()).slice(0,40);
+  return cap(String(x||'').replace(spaceWordRe(),'').replace(/\b(recurring|one-?off|section)\b/ig,'').replace(/\s+/g,' ').replace(/\s+(for|to|in|on|into)\s*$/i,'').trim()).slice(0,40);
 }
 function findSection(name, space){
   const n = String(name||'').toLowerCase().trim();
@@ -539,25 +674,105 @@ function parseSection(clean, t, space){
   }
   return null;
 }
+function itemQuery(q){
+  return String(q||'').toLowerCase()
+    .replace(/\b(mon|monday|tue|tues|tuesday|wed|wednesday|thu|thur|thurs|thursday|fri|friday|sat|saturday|sun|sunday|today|tomorrow|next)\b/g,' ')
+    .replace(/\b\d{1,2}(:\d{2})?\s*(am|pm)\b/g,' ').replace(/\b(the|my|on|at|for|a|an)\b/g,' ')
+    .replace(/\s+/g,' ').trim();
+}
+function findItems(q, day){
+  const n = itemQuery(q); if (!n) return [];
+  const ok = txt => { const x = String(txt).toLowerCase(); return x.includes(n) || n.includes(x); };
+  const out = [];
+  S.events.forEach(e => { if (isOn(e.space) && ok(e.title) && (!day || e.day===day)) out.push({kind:'event', id:e.id, label:`${e.title} (${fullDate(e.day)} ${e.time})`}); });
+  S.todos.forEach(t => { if (isOn(t.space) && ok(t.text)) out.push({kind:'todo', id:t.id, label:`${t.text} (to-do)`}); });
+  S.checklists.forEach(l => { if (isOn(l.space)) l.items.forEach((it,i) => { if (ok(it.t)) out.push({kind:'item', id:l.id, index:i, label:`${it.t} (${l.title})`}); }); });
+  return out;
+}
+function findSectionByName(name){
+  const n = String(name||'').toLowerCase().trim();
+  return S.checklists.find(l => isOn(l.space) && l.title.toLowerCase() === n) || S.checklists.find(l => isOn(l.space) && (l.title.toLowerCase().includes(n) || n.includes(l.title.toLowerCase()))) || null;
+}
+const MONTH_WORD = '(?:st|nd|rd|th)?\\s*(?:nov|november|dec|december|jan|january|feb|february|mar|march|apr|april|may|jun|june|jul|july|aug|august|sep|sept|september|oct|october)\\b';
+const RANGE_RE = new RegExp('\\b(?:from\\s+)?(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?\\s*(?:to|-|–|till|until|til)\\s*(\\d{1,2})(?::(\\d{2}))?\\s*(am|pm)?\\b(?!\\s*' + MONTH_WORD + ')', 'i');
+const RANGE_G = new RegExp(RANGE_RE.source, 'gi');
+const SINGLE_RE = /\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b|\b(\d{1,2}):(\d{2})\b/i;
+function hhmm(h, mi, sfx){
+  let x = +h;
+  if (sfx){ const q = sfx.toLowerCase(); if (q==='pm' && x<12) x += 12; if (q==='am' && x===12) x = 0; }
+  if (x > 23 || +mi > 59) return null;
+  return String(x).padStart(2,'0') + ':' + mi;
+}
+/* "11:00 to 11:25", "11 to 11:25am", "2-3:30pm", or one time such as "11:03" or "11am" */
+function parseRange(t){
+  const str = String(t||''), r = str.match(RANGE_RE);
+  if (r && (r[2] || r[3] || r[5] || r[6])){
+    let start = hhmm(r[1], r[2]||'00', r[3] || r[6]);
+    const end = hhmm(r[4], r[5]||'00', r[6] || r[3]);
+    if (start && end && end <= start && !r[3]) start = hhmm(r[1], r[2]||'00', 'am');
+    if (start && end && end > start) return {time:start, end};
+  }
+  const s1 = str.match(SINGLE_RE);
+  if (s1){ const time = s1[1] ? hhmm(s1[1], s1[2]||'00', s1[3]) : hhmm(s1[4], s1[5], null); if (time) return {time}; }
+  return null;
+}
+function itemAction(query, type, fields, verb){
+  const day = resolveDay(String(query).toLowerCase());
+  const hits = findItems(query, day);
+  if (!hits.length) return {reply:`I couldn't find "${itemQuery(query)}".`, actions:[]};
+  if (hits.length > 1) return {reply:'Which one do you mean? ' + hits.slice(0,4).map((h,k) => `${k+1}, ${h.label}`).join('. ') + '. Say it more exactly.', actions:[]};
+  const h = hits[0];
+  return {reply:`Here is what I'll ${verb}.`, actions:[{type, kind:h.kind, id:h.id, index:h.index, label:h.label, ...fields}]};
+}
+function parseTaskAction(clean){
+  let m;
+  m = clean.match(/^remind me\s+(\d+)\s*(minutes?|mins?|hours?|hrs?)\s+before\s+(?:the\s+|my\s+)?(.+)$/i);
+  if (m){ const mins = /hour|hr/i.test(m[2]) ? +m[1]*60 : +m[1]; return itemAction(m[3], 'edit_item', {remind: mins}, 'set this reminder'); }
+  m = clean.match(/^(?:rename|change)\s+(?:the\s+)?section\s+(.+?)\s+to\s+(.+)$/i);
+  if (m){ const sec = findSectionByName(cleanName(m[1])); if (!sec) return {reply:`I couldn't find a section called ${m[1]}.`, actions:[]}; return {reply:'Here is the new name.', actions:[{type:'edit_section', id:sec.id, label:sec.title, title:cleanName(m[2])}]}; }
+  m = clean.match(/^(?:delete|remove)\s+(?:the\s+)?section\s+(.+)$/i);
+  if (m){ const sec = findSectionByName(cleanName(m[1])); if (!sec) return {reply:`I couldn't find a section called ${m[1]}.`, actions:[]}; return {reply:"Here is the section I'll delete.", actions:[{type:'delete_section', id:sec.id, label:sec.title}]}; }
+  m = clean.match(/^(?:rename)\s+(?:the\s+)?(.+?)\s+to\s+(.+)$/i);
+  if (m){
+    const sec = findSectionByName(cleanName(m[1]));
+    if (sec) return {reply:'Here is the new name.', actions:[{type:'edit_section', id:sec.id, label:sec.title, title:cleanName(m[2])}]};
+    return itemAction(m[1], 'edit_item', {title: cap(m[2].trim()).slice(0,60)}, 'rename it');
+  }
+  m = clean.match(/^(?:move|reschedule|change)\s+(?:the\s+)?(.+?)\s+to\s+(.+)$/i);
+  if (m){
+    const target = m[2], fields = {};
+    const day = resolveDay(target.toLowerCase()); if (day) fields.day = day;
+    const rg = parseRange(target); if (rg && /\d\s*(am|pm)|\d:\d/i.test(target)){ fields.time = rg.time; if (rg.end) fields.end = rg.end; }
+    if (!fields.day && !fields.time) return {reply:'Tell me the new day or time.', actions:[]};
+    return itemAction(m[1], 'edit_item', fields, 'move it');
+  }
+  m = clean.match(/^(?:mark|tick|check off|complete)\s+(?:the\s+)?(.+?)(?:\s+(?:as\s+)?done)?$/i);
+  if (m) return itemAction(m[1], 'done_item', {}, 'mark it done');
+  m = clean.match(/^(?:delete|remove)\s+(?:the\s+)?(.+)$/i);
+  if (m) return itemAction(m[1], 'delete_item', {}, 'delete it');
+  return null;
+}
 function parse(text){
   const t = text.toLowerCase();
   const day = resolveDay(t) || calDay;
-  let time = '09:00';
-  const m2 = t.match(/(\d{1,2})(?::(\d{2}))?\s*(am|pm)/);
-  const hasTime = !!m2;
-  if (m2){ let h = parseInt(m2[1],10)%12; if (m2[3]==='pm') h+=12; time = String(h).padStart(2,'0')+':'+(m2[2]||'00'); }
+  let time = '09:00', end;
+  const rg = parseRange(t);
+  const hasTime = !!rg;
+  if (rg){ time = rg.time; end = rg.end; }
   else if (/afternoon/.test(t)) time='14:00'; else if (/evening/.test(t)) time='18:00';
   const clean = text.replace(/^\s*(please\s+)?/i,'').trim();
   const space = guessSpace(t);
 
-  if (isQuestion(t)) return answerQuery(day, time, hasTime);
+  if (isQuestion(t)) return answerQuery(day, time, hasTime, end);
+  const task = parseTaskAction(clean);
+  if (task) return task;
 
   if (/\b(post|draft|caption)\b|instagram|facebook|whatsapp|google/.test(t)){
     const sp = postSpaces().includes(space) ? space : postSpaces()[0];
     if (!sp) return {reply:'Posts need Personal or Business turned on in Settings.', actions:[]};
     let platform = /instagram/.test(t)?'instagram':/facebook/.test(t)?'facebook':/google/.test(t)?'gbp':'whatsapp';
     if (!SPACES[sp].platforms.includes(platform)) platform = SPACES[sp].platforms[0];
-    const note = clean.replace(/^.*?\b(about|for)\s+/i,'').replace(/\b(personal|business|work)\b/ig,'').replace(/\s+(for|to|in)\s*$/i,'').replace(/\s+/g,' ').trim();
+    const note = clean.replace(/^.*?\b(about|for)\s+/i,'').replace(spaceWordRe(),'').replace(/\s+(for|to|in)\s*$/i,'').replace(/\s+/g,' ').trim();
     return {reply:"Here's the post I'll add as a draft.", actions:[{type:'create_post',space:sp,platform,day,note}]};
   }
   const sec = parseSection(clean, t, space);
@@ -566,30 +781,68 @@ function parse(text){
     return {reply:"Here's the task I'll add.", actions:[{type:'create_todo',space,text:cap(clean.replace(/^remind me to\s*/i,'').replace(/^add (a )?(task|to-?do)( to)?\s*/i,''))}]};
   if (/\b(block|focus|admin|hold|break)\b/.test(t)){
     const title = cap(stripWhen(clean.replace(/^block\s*/i,'')).replace(/^for\s+/i,'')) || 'Blocked time';
-    return {reply:"Here's the time I'll block.", actions:[{type:'create_block',space,day,time,title:title.slice(0,60)}]};
+    return {reply:"Here's the time I'll block.", actions:[{type:'create_block',space,day,time,end,title:title.slice(0,60)}]};
   }
   if (/\b(book|appointment|consult|braids|silk|cut|meeting|lunch|dinner|gym|party|add|event|call|visit)\b/.test(t)){
     const title = cap(stripWhen(clean.replace(/^(book|add|schedule)\s+(an?\s+)?/i,'')).replace(/\s+(for|with|on|at)$/i,'')) || 'New event';
-    return {reply:"Here's the event I'll add.", actions:[{type:'create_appointment',space,day,time,title:title.slice(0,60)}]};
+    return {reply:"Here's the event I'll add.", actions:[{type:'create_appointment',space,day,time,end,title:title.slice(0,60)}]};
   }
   return {reply:"I can plan events, block time, add tasks or draft posts. Try one of the suggestions below.", actions:[]};
 }
 function describe(a){
   const sp = SPACES[a.space] ? nm(a.space) : '';
-  if (a.type==='create_block') return `[${sp}] Block ${fullDate(a.day)} ${a.time}: ${a.title}`;
-  if (a.type==='create_appointment') return `[${sp}] ${fullDate(a.day)} ${a.time}: ${a.title}`;
+  if (a.type==='create_block') return `[${sp}] Block ${fullDate(a.day)} ${timeLabel(a)}: ${a.title}`;
+  if (a.type==='create_appointment') return `[${sp}] ${fullDate(a.day)} ${timeLabel(a)}: ${a.title}`;
   if (a.type==='create_todo') return `[${sp}] Add task: ${a.text}`;
+  if (a.type==='edit_item'){ const ch = [a.title && 'title to '+a.title, a.day && 'date to '+fullDate(a.day), a.time && 'time to '+timeLabel(a), a.remind!==undefined && (a.remind===null ? 'no reminder' : 'reminder '+remindText(a.remind))].filter(Boolean); return `Change ${a.label}: ${ch.join(', ')}`; }
+  if (a.type==='delete_item') return `Delete ${a.label}`;
+  if (a.type==='done_item') return `Mark done: ${a.label}`;
+  if (a.type==='edit_section') return `Rename section ${a.label} to ${a.title}`;
+  if (a.type==='delete_section') return `Delete section ${a.label}`;
   if (a.type==='create_section') return `[${sp}] New ${a.recurring ? 'recurring' : 'one-off'} section: ${a.title}`;
   if (a.type==='add_to_section') return `[${sp}] Add to ${a.section}: ${a.text}`;
   if (a.type==='create_post') return `[${sp}] ${PLAT[a.platform].n} draft: ${(a.caption||template(a.note,a.platform,a.space)).slice(0,80)}…`;
   return '';
 }
+function locateItem(a){
+  if (a.kind==='event'){ const obj = S.events.find(x => x.id === a.id); return obj ? {obj} : null; }
+  if (a.kind==='todo'){ const obj = S.todos.find(x => x.id === a.id); return obj ? {obj} : null; }
+  const sec = S.checklists.find(x => x.id === a.id); const obj = sec && sec.items[a.index];
+  return obj ? {obj, sec, idx:a.index} : null;
+}
 function applyAction(a){
   const vis = 'busy';
-  if (a.type==='create_block'){ S.events.push({id:uid(),space:a.space,day:a.day,time:a.time,title:a.title,kind:'Block',vis}); calDay = a.day; return `Blocked ${fullDate(a.day)} ${a.time} in ${nm(a.space)}`; }
-  if (a.type==='create_appointment'){ S.events.push({id:uid(),space:a.space,day:a.day,time:a.time,title:a.title,kind:KIND[a.space],vis}); calDay = a.day; return `Added to ${fullDate(a.day)} (${nm(a.space)})`; }
+  if (a.type==='create_block'){ S.events.push({id:uid(),space:a.space,day:a.day,time:a.time,end:a.end,title:a.title,kind:'Block',vis}); calDay = a.day; return `Blocked ${fullDate(a.day)} ${timeLabel(a)} in ${nm(a.space)}`; }
+  if (a.type==='create_appointment'){ S.events.push({id:uid(),space:a.space,day:a.day,time:a.time,end:a.end,title:a.title,kind:KIND[a.space],vis}); calDay = a.day; return `Added to ${fullDate(a.day)} (${nm(a.space)})`; }
   if (a.type==='create_todo'){ S.todos.push({id:uid(),space:a.space,text:a.text,done:false,due:'This week'}); return 'Task added'; }
   if (a.type==='create_section'){ S.checklists.push({id:uid(),space:a.space,title:a.title,items:[],recurring:!!a.recurring}); return `Created section ${a.title}`; }
+  if (a.type==='edit_item'){
+    const r = locateItem(a); if (!r) return 'That item is no longer there';
+    if (a.remind!==undefined && a.remind!==null && !(r.day||a.day) && !(r.time||a.time)) return 'Add a date and time before setting a reminder';
+    if (a.title){ if (a.kind==='event') r.obj.title = a.title; else if (a.kind==='todo') r.obj.text = a.title; else r.obj.t = a.title; }
+    if (a.day) r.obj.day = a.day;
+    if (a.time){ r.obj.time = a.time; r.obj.end = a.end; }
+    if (a.remind!==undefined) r.obj.remind = a.remind;
+    save(); return `Updated ${a.title || a.label}`;
+  }
+  if (a.type==='delete_item'){
+    const r = locateItem(a); if (!r) return 'That item is no longer there';
+    if (a.kind==='event'){ bin('event', r.obj, r.obj.title); S.events = S.events.filter(x => x !== r.obj); }
+    if (a.kind==='todo'){ bin('todo', r.obj, r.obj.text); S.todos = S.todos.filter(x => x !== r.obj); }
+    if (a.kind==='item'){ bin('item', {section:{id:r.sec.id, space:r.sec.space, title:r.sec.title, recurring:r.sec.recurring}, index:r.idx, item:r.obj}, r.obj.t); r.sec.items.splice(r.idx,1); }
+    save(); return `Deleted ${a.label}`;
+  }
+  if (a.type==='done_item'){
+    const r = locateItem(a); if (!r) return 'That item is no longer there';
+    if (a.kind==='event') return 'Calendar items cannot be ticked off';
+    if (a.kind==='todo') r.obj.done = true; else r.obj.d = true;
+    save(); return `Done: ${a.label}`;
+  }
+  if (a.type==='edit_section'){ const l = S.checklists.find(x => x.id === a.id); if (!l) return 'That section is no longer there'; l.title = a.title; save(); return `Renamed to ${a.title}`; }
+  if (a.type==='delete_section'){
+    const l = S.checklists.find(x => x.id === a.id); if (!l) return 'That section is no longer there';
+    bin('section', l, l.title); S.checklists = S.checklists.filter(x => x !== l); save(); return `Deleted section ${l.title}`;
+  }
   if (a.type==='add_to_section'){
     let l = findSection(a.section, a.space);
     if (!l){ l = {id:uid(),space:a.space,title:a.section,items:[],recurring:false}; S.checklists.push(l); }
@@ -612,12 +865,13 @@ function toast(msg){
 /* ---------- Shared pieces ---------- */
 function evCard({e, own, masked}, del){
   if (masked) return `<div class="ev"><span class="bar" style="background:${GREY.c}"></span>
-    <span class="time">${esc(e.time)}</span>
+    <span class="time">${esc(timeLabel(e))}</span>
     <span class="t"><div>Busy</div>${chip('Busy · '+nm(e.space), GREY)}</span></div>`;
   const sp = SPACES[e.space];
-  return `<div class="ev"><span class="bar" style="background:${sp.c}"></span>
-    <span class="time">${esc(e.time)}</span>
-    <span class="t"><div>${esc(e.title)}</div>${chip(nm(e.space), sp)}</span>
+  const past = new Date(e.day+'T'+endOf(e)+':00').getTime() < Date.now();
+  return `<div class="ev ${past?'past':''}"><span class="bar" style="background:${sp.c}"></span>
+    <span class="time">${esc(timeLabel(e))}</span>
+    <span class="t" data-act="edit-event" data-id="${e.id}" style="cursor:pointer"><div>${esc(e.title)}</div>${chip(nm(e.space), sp)}</span>
     ${del && own ? `<button class="x" data-act="del-event" data-id="${e.id}" aria-label="Remove">${I('x',18)}</button>` : ''}
   </div>`;
 }
@@ -668,8 +922,8 @@ function welcome(){
 
 function heroCard(){
   const st = taskStats(null);
-  const next = S.events.filter(e => isOn(e.space) && e.day === TODAY && e.time >= NOW).sort(byTime)[0];
-  return `<div class="hero"><div style="flex:1;min-width:0"><div class="hi">Good morning · ${fullDate(TODAY)}</div><div class="biz">Hi, ${esc(firstName())}</div><div class="next"><span class="hi" style="opacity:.85">Next up</span><b>${next ? `${next.time} · ${esc(next.title)}` : 'Nothing else planned today'}</b></div></div>
+  const next = S.events.filter(e => isOn(e.space) && e.day === TODAY && e.time >= nowHHMM()).sort(byTime)[0];
+  return `<div class="hero"><div style="flex:1;min-width:0"><div class="hi">${greetWord()} · ${fullDate(TODAY)}</div><div class="biz">Hi, ${esc(firstName())}</div><div class="next"><span class="hi" style="opacity:.85">Next up</span><b>${next ? `${next.time} · ${esc(next.title)}` : 'Nothing else planned today'}</b></div></div>
     <div style="flex:none;text-align:center"><div style="width:66px;height:66px;border-radius:50%;background:conic-gradient(#fff ${st.pct*3.6}deg, rgba(255,255,255,.25) 0);display:flex;align-items:center;justify-content:center"><span style="width:52px;height:52px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:14px">${st.done}/${st.total}</span></div><div style="font-size:11px;margin-top:4px;opacity:.9">tasks done</div></div></div>`;
 }
 function quickTiles(){
@@ -678,7 +932,7 @@ function quickTiles(){
 }
 function calendar(){
   const week = weekOf(calDay);
-  const strip = week.map(d => { const n = dayItems(d,'cal').length; return `<button class="day press ${d===calDay?'on':''}" data-act="pick-day" data-d="${d}">${dName(d).slice(0,3)}<b>${dNum(d)}</b>${n?'<span class="dot"></span>':''}</button>`; }).join('');
+  const strip = week.map(d => { const n = dayItems(d,'cal').length; return `<button class="day press ${d===calDay?'on':''} ${d===TODAY?'today':''}" data-act="pick-day" data-d="${d}" aria-label="${d===TODAY?'Today, ':''}${fullDate(d)}">${d===TODAY?'<i class="tg">Today</i>':dName(d).slice(0,3)}<b>${dNum(d)}</b>${n?'<span class="dot"></span>':''}</button>`; }).join('');
   const list = dayItems(calDay,'cal');
   const legend = active().map(s => `<span style="--c:${SPACES[s].c}">${nm(s)}</span>`).join('')
     + (LENS.cal !== 'all' ? `<span style="--c:${GREY.c}">Busy from other spaces</span>` : '');
@@ -710,9 +964,9 @@ function tasks(){
   const st = taskStats('tasks');
   const L = LENS.tasks;
   const spaceChip = s => L==='all' ? ` ${chip(nm(s), SPACES[s])}` : '';
-  const lists = st.lists.map(l => `<div class="card"><div class="row-head"><h3>${esc(l.title)}</h3>${l.recurring === false ? chip('One-off',{bg:'#EEF2F7',fg:'#475569'}) : chip('Recurring',{bg:'#E6F4F1',fg:'#0F766E'})}${spaceChip(l.space)}<button class="x" data-act="del-section" data-l="${l.id}" aria-label="Delete section" style="margin-left:auto">${I('trash',17)}</button></div>
-    ${l.items.map((it,i) => `<div class="task press ${it.d?'done':''}" data-act="item" data-l="${l.id}" data-i="${i}" style="cursor:pointer"><span class="check">${it.d?I('check',15):''}</span><span class="t">${esc(it.t)}</span><button class="x" data-act="del-item" data-l="${l.id}" data-i="${i}" aria-label="Delete item" style="margin-left:auto">${I('trash',17)}</button></div>`).join('')}</div>`).join('');
-  const one = st.todos.map(t => `<div class="task ${t.done?'done':''}"><span class="check press" data-act="todo" data-id="${t.id}" style="cursor:pointer">${t.done?I('check',15):''}</span><span class="t">${esc(t.text)}${spaceChip(t.space) ? '<div style="margin-top:4px">'+spaceChip(t.space)+'</div>' : ''}</span>${chip(t.due,{bg:'#FEF3C7',fg:'#B45309'})}<button class="x" data-act="del-todo" data-id="${t.id}" aria-label="Delete">${I('trash',17)}</button></div>`).join('');
+  const lists = st.lists.map(l => `<div class="card"><div class="row-head"><h3 data-act="edit-section" data-l="${l.id}" style="cursor:pointer">${esc(l.title)}</h3>${l.recurring === false ? chip('One-off',{bg:'#EEF2F7',fg:'#475569'}) : chip('Recurring',{bg:'#E6F4F1',fg:'#0F766E'})}${spaceChip(l.space)}</div>
+    ${l.items.map((it,i) => `<div class="task press ${it.d?'done':''}" data-act="item" data-l="${l.id}" data-i="${i}" style="cursor:pointer"><span class="check">${it.d?I('check',15):''}</span><span class="t" data-act="edit-item" data-l="${l.id}" data-i="${i}" style="cursor:pointer;flex:1">${esc(it.t)}</span><button class="x" data-act="del-item" data-l="${l.id}" data-i="${i}" aria-label="Delete item" style="margin-left:auto">${I('trash',17)}</button></div>`).join('')}</div>`).join('');
+  const one = st.todos.map(t => `<div class="task ${t.done?'done':''}"><span class="check press" data-act="todo" data-id="${t.id}" style="cursor:pointer">${t.done?I('check',15):''}</span><span class="t" data-act="edit-todo" data-id="${t.id}" style="cursor:pointer">${esc(t.text)}${spaceChip(t.space) ? '<div style="margin-top:4px">'+spaceChip(t.space)+'</div>' : ''}</span>${(t.day||t.due) ? chip(dueText(t),{bg:'#FEF3C7',fg:'#B45309'}) : ''}${t.remind!=null ? chip('🔔 '+remindText(t.remind),{bg:'#EEF2F7',fg:'#475569'}) : ''}<button class="x" data-act="del-todo" data-id="${t.id}" aria-label="Delete">${I('trash',17)}</button></div>`).join('');
   return `<div class="row-head"><h1>Tasks</h1></div>
   <div class="addrow"><button class="btn sm press" data-act="sheet-task">+ Add task</button></div>
   <div style="margin-top:10px">${lensBar('tasks')}</div>
@@ -741,7 +995,7 @@ function postsView(){
   <p class="muted" style="margin:0 0 12px">Previews only. Nothing is sent to real accounts.</p>
   ${lensBar('posts')}
   <div class="seg">${seg}</div>
-  ${cards || empty('posts', L==='work' ? 'Work has no posts. Choose All or Personal or Business.' : 'No posts here yet. Ask SmartDesk to draft one.', 'Ask SmartDesk', 'open-ask')}`;
+  ${cards || empty('posts', L==='work' ? `${nm('work')} has no posts. Choose All or Personal or Business.` : 'No posts here yet. Ask SmartDesk to draft one.', 'Ask SmartDesk', 'open-ask')}`;
 }
 
 function settings(){
@@ -757,7 +1011,8 @@ function settings(){
     <p class="muted" style="margin:6px 0 10px">Demo account, saved on this device only.</p>
     <button class="btn soft block press" data-act="signout">Sign out</button></div>
   <div class="card"><h3>Your spaces</h3><p class="muted" style="margin:6px 0 10px">Turn a space on or off. Off spaces are hidden but their data is kept.</p>
-    ${spaceRows('toggle-space')}</div>
+    ${spaceRows('toggle-space')}<button class="btn soft block press" style="margin-top:10px" data-act="sheet-rename">Rename spaces</button></div>
+  ${remindCard()}${binCard()}
   <div class="card"><div class="row-head"><h3>Calendar sync</h3>${chip('Preview',{bg:'#FDE7E3',fg:'#B53F2C'})}</div>${sync}</div>
   ${isOn('business') ? `<div class="card"><div class="row-head"><h3>Customer booking page</h3>${chip('Preview',{bg:'#FDE7E3',fg:'#B53F2C'})}</div>
     <p class="muted" style="margin:6px 0 12px">What customers see when they book online. They see only busy times, never details.</p>
@@ -785,7 +1040,7 @@ function chatSheet(){
     let plan = '';
     if (m.plan){
       plan = `<div class="plan"><b>Plan</b><ul>${m.plan.map(a => {
-          const hits = (m.status==='pending' && (a.type==='create_block'||a.type==='create_appointment')) ? clashes(a.day, a.time) : [];
+          const hits = (m.status==='pending' && (a.type==='create_block'||a.type==='create_appointment')) ? clashes(a.day, a.time, a.end) : [];
           return `<li>${esc(describe(a))}${hits.length ? `<div style="color:#8A4B0B;font-size:12px">⚠ Overlaps ${hits.map(h => `${esc(h.title)} (${nm(h.space)})`).join(', ')}</div>` : ''}</li>`;
         }).join('')}</ul>
       ${m.status==='pending' ? `<div class="acts"><button class="btn sm press" data-act="plan-ok" data-m="${i}">${I('check',16)} Confirm</button><button class="btn sm soft press" data-act="plan-no" data-m="${i}">Cancel</button></div>`
@@ -803,10 +1058,62 @@ function chatSheet(){
   <p class="muted" style="margin:4px 0 10px">Spaces: ${active().map(nm).join(' · ')}. Nothing changes until you confirm.</p>
   <div id="msgs">${msgs}</div>
   <div class="sugg">${sugg.map(([l,t]) => `<button class="press" data-act="suggest" data-t="${esc(t)}">${l}</button>`).join('')}</div>
-  <div class="chatbar" style="position:static;background:none;padding:6px 0 0"><input id="sheet-in" class="askin" placeholder="Type a request…" autocomplete="off"><button class="send press" data-act="send-sheet" aria-label="Send">${I('send')}</button></div><button class="btn soft block press" style="margin-top:12px" data-act="close">Done</button>`;
+  <div class="chatbar" style="position:static;background:none;padding:6px 0 0"><input id="sheet-in" class="askin" placeholder="Type a request…" autocomplete="off">${SR ? `<button class="send press mic" data-act="voice" aria-label="Speak to SmartDesk">${MIC_SVG}</button>` : ''}<button class="send press" data-act="send-sheet" aria-label="Send">${I('send')}</button></div><button class="btn soft block press" style="margin-top:12px" data-act="close">Done</button>`;
 }
 const SHEETS = {
   chat(){ return chatSheet(); },
+  rename(){
+    const s = sheet;
+    return `<h3>Rename spaces</h3><p class="muted">The new names show everywhere, and the assistant understands them. Your items stay where they are.</p>
+    ${ORDER.map(k => `<span class="lbl">${k[0].toUpperCase()+k.slice(1)} is shown as</span><input class="field" data-sf="lbl_${k}" value="${esc(s['lbl_'+k] !== undefined ? s['lbl_'+k] : SPACES[k].label)}" maxlength="20">`).join('')}
+    ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
+    <button class="btn block press" style="margin-top:14px" data-act="save-rename">Save names</button>`;
+  },
+  'edit-event'(){
+    const s = sheet;
+    return `<h3>Edit calendar item</h3>
+    <span class="lbl">Title</span><input class="field" data-sf="title" value="${esc(s.title)}" maxlength="60">
+    <span class="lbl">Date</span><input class="field" type="date" data-sf="day" value="${s.day}">
+    <span class="lbl">Start</span><input class="field" type="time" data-sf="time" value="${s.time}">
+    <span class="lbl">Until (optional)</span><input class="field" type="time" data-sf="end" value="${s.end||''}">
+    <span class="lbl">Space</span><div class="pills">${active().map(k=>`<button class="pill ${k===s.space?'on':''}" data-act="sf" data-k="space" data-v="${k}">${nm(k)}</button>`).join('')}</div>
+    <span class="lbl">Reminder</span>${remindPills(s.remind,'remind')}
+    ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
+    <button class="btn block press" style="margin-top:14px" data-act="save-event">Save</button>
+    <button class="btn soft block press" style="margin-top:8px;color:#B53F2C" data-act="del-event" data-id="${s.id}">Delete</button>`;
+  },
+  'edit-section'(){
+    const s = sheet;
+    return `<h3>Edit section</h3>
+    <span class="lbl">Section name</span><input class="field" data-sf="title" value="${esc(s.title)}" maxlength="40">
+    <span class="lbl">Type</span><div class="pills">
+      <button class="pill ${s.kind!=='recurring'?'on':''}" data-act="sf" data-k="kind" data-v="oneoff">One-off</button>
+      <button class="pill ${s.kind==='recurring'?'on':''}" data-act="sf" data-k="kind" data-v="recurring">Recurring</button></div>
+    ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
+    <button class="btn block press" style="margin-top:14px" data-act="save-section">Save</button>
+    <button class="btn soft block press" style="margin-top:8px;color:#B53F2C" data-act="${s.armed ? 'del-section' : 'arm-del-section'}" data-l="${s.l}">${s.armed ? 'Tap again to delete this section' : 'Delete section'}</button>`;
+  },
+  'edit-todo'(){
+    const s = sheet;
+    return `<h3>Edit task</h3>
+    <span class="lbl">Task</span><input class="field" data-sf="text" value="${esc(s.text)}" maxlength="120">
+    ${whenFields(s)}
+    ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
+    <button class="btn block press" style="margin-top:14px" data-act="save-todo">Save</button>
+    <button class="btn soft block press" style="margin-top:8px;color:#B53F2C" data-act="del-todo" data-id="${s.id}">Delete</button>`;
+  },
+  'edit-item'(){
+    const s = sheet;
+    const from = S.checklists.find(x => x.id === s.l);
+    const secs = from ? S.checklists.filter(l => isOn(l.space) && l.space === from.space) : [];
+    return `<h3>Edit task</h3>
+    <span class="lbl">Task</span><input class="field" data-sf="text" value="${esc(s.text)}" maxlength="120">
+    ${whenFields(s)}
+    <span class="lbl">Section</span><div class="pills">${secs.map(l => `<button class="pill ${l.id===s.to?'on':''}" data-act="sf" data-k="to" data-v="${l.id}">${esc(l.title)}</button>`).join('')}</div>
+    ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
+    <button class="btn block press" style="margin-top:14px" data-act="save-item">Save</button>
+    <button class="btn soft block press" style="margin-top:8px;color:#B53F2C" data-act="del-item" data-l="${s.l}" data-i="${s.i}">Delete task</button>`;
+  },
   spaces(){
     return `<h3>Your spaces</h3><p class="muted">Busy time in one space shows in the others. Turn on the ones you manage.</p>
     <div style="margin-top:14px">${spaceRows('toggle-space')}</div>
@@ -832,9 +1139,12 @@ const SHEETS = {
     <span class="lbl">What's happening?</span><input class="field" data-sf="title" value="${esc(s.title)}" placeholder="e.g. Dinner with Kemi">
     <span class="lbl">Space</span><div class="pills">${spacePills(s)}</div>
     <span class="lbl">Day</span><div class="pills">${dayPills(s)}</div>
-    <span class="lbl">Time</span>${timePills(s,'time')}
+    <span class="lbl">Start</span><input class="field" type="time" data-sf="time" value="${s.time||''}">
+    ${timePills(s,'time')}
+    <span class="lbl">Until (optional)</span><input class="field" type="time" data-sf="end" value="${s.end||''}">
     <span class="lbl">Other spaces see</span>${visPills(s)}
-    ${conflictNote(s.day, s.time)}
+    ${conflictNote(s.day, s.time, s.end)}
+    <span class="lbl">Reminder</span>${remindPills(s.remind,'remind')}
     ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
     <button class="btn block press" style="margin-top:18px" data-act="do-event">Add to calendar</button>`;
   },
@@ -843,10 +1153,12 @@ const SHEETS = {
     return `<h3>Block time</h3><p class="muted">Protect time in one space. Other spaces see it as busy.</p>
     <span class="lbl">Space</span><div class="pills">${spacePills(s)}</div>
     <span class="lbl">Day</span><div class="pills">${dayPills(s)}</div>
-    <span class="lbl">Start</span>${timePills(s,'time')}
+    <span class="lbl">Start</span><input class="field" type="time" data-sf="time" value="${s.time||''}">
+    ${timePills(s,'time')}
+    <span class="lbl">Until (optional)</span><input class="field" type="time" data-sf="end" value="${s.end||''}">
     <span class="lbl">What for?</span><input class="field" data-sf="title" value="${esc(s.title)}" placeholder="e.g. Admin, focus or rest">
     <span class="lbl">Other spaces see</span>${visPills(s)}
-    ${conflictNote(s.day, s.time)}
+    ${conflictNote(s.day, s.time, s.end)}
     <button class="btn block press" style="margin-top:18px" data-act="do-block">Block time</button>`;
   },
   task(){
@@ -867,6 +1179,7 @@ const SHEETS = {
     <span class="lbl">Add to</span><div class="pills">${secPills}</div>
     ${cur==='new' ? `<span class="lbl">Section name</span><input class="field" data-sf="newSection" value="${esc(s.newSection||'')}" placeholder="e.g. Morning routine">` : ''}
     <span class="lbl">Task</span><input class="field" data-sf="text" value="${esc(s.text)}" placeholder="e.g. Reorder shampoo">
+    ${whenFields(s)}
     ${cur==='' ? `<span class="lbl">Due</span><div class="pills">${['Today','Tomorrow','This week','Next week'].map(v=>`<button class="pill ${v===s.due?'on':''}" data-act="sf" data-k="due" data-v="${v}">${v}</button>`).join('')}</div>` : ''}
     ${s.err?`<div class="err">${esc(s.err)}</div>`:''}
     <button class="btn block press" style="margin-top:18px" data-act="do-task">Add task</button>`;
@@ -923,7 +1236,7 @@ function render(){
     ? `<button class="ask press" data-tab="chat"><span class="fab">${I(ic,26)}</span>Ask</button>`
     : `<button class="tab press ${view===k?'on':''}" data-tab="${k}">${I(ic)}${l}<span class="pip"></span></button>`).join('');
   const hideAsk = view==='signup' || view==='welcome';
-  $('#askbar').innerHTML = hideAsk ? '' : `<input id="ask-in" class="askin" placeholder="Ask SmartDesk to block, book, add or draft…" autocomplete="off">${SR ? `<button class="send press" id="mic" data-act="voice" aria-label="Speak to SmartDesk">${MIC_SVG}</button>` : ''}<button class="send press" data-act="send-ask" aria-label="Send">${I('send')}</button>`;
+  $('#askbar').innerHTML = hideAsk ? '' : `<input id="ask-in" class="askin" placeholder="Ask SmartDesk to block, book, add or draft…" autocomplete="off">${SR ? `<button class="send press mic" data-act="voice" aria-label="Speak to SmartDesk">${MIC_SVG}</button>` : ''}<button class="send press" data-act="send-ask" aria-label="Send">${I('send')}</button>`;
   $('#screen').innerHTML = VIEWS[view]();
   if (view==='chat'){ const sc = $('#screen'); sc.scrollTop = sc.scrollHeight; }
 }
@@ -944,31 +1257,96 @@ async function send(textArg, fromVoice=false){
   chat.push({who:'bot',text:r.reply + (live?'':' (offline mode)'),plan:r.actions.length?r.actions:null,status:'pending'});
   busy = false;
   showChat();
-  if (fromVoice) speak(r.reply);
+  if (fromVoice) voiceReply(r);
 }
 /* ---------- Voice (browser speech recognition and speech output) ---------- */
 const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-let rec = null, listening = false;
+let rec = null, listening = false, voicePick = null;
 const MIC_SVG = '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4"/></svg>';
-function setMic(){ const b = document.getElementById('mic'); if (b) b.classList.toggle('on', listening); }
+function setMic(){ document.querySelectorAll('.mic').forEach(b => b.classList.toggle('on', listening)); }
+function listen(onText){
+  if (!SR) return;
+  const r = new SR(); r.lang = 'en-US'; r.interimResults = false; r.maxAlternatives = 1;
+  r.onstart = () => { listening = true; setMic(); };
+  r.onresult = e => onText(e.results[0][0].transcript.toLowerCase());
+  r.onerror = () => { listening = false; setMic(); toast('Didn’t hear that. Tap Confirm to continue'); };
+  r.onend = () => { listening = false; setMic(); };
+  rec = r;
+  try { r.start(); } catch(err) { listening = false; setMic(); }
+}
 function startVoice(){
   if (!SR) return toast('Voice needs Chrome or Safari');
   if (listening){ rec && rec.stop(); return; }
-  // Unlock speech output inside this tap, so replies can be spoken later
   if ('speechSynthesis' in window) speechSynthesis.speak(new SpeechSynthesisUtterance(''));
-  rec = new SR(); rec.lang = 'en-US'; rec.interimResults = false; rec.maxAlternatives = 1;
-  rec.onstart = () => { listening = true; setMic(); toast('Listening…'); };
-  rec.onresult = e => { const text = e.results[0][0].transcript; send(text, true); };
-  rec.onerror = e => toast(e.error === 'not-allowed' || e.error === 'service-not-allowed' ? 'Allow microphone access in your browser settings' : 'Didn’t catch that, try again');
-  rec.onend = () => { listening = false; setMic(); };
-  try { rec.start(); } catch(err) { listening = false; setMic(); }
+  listen(text => send(text, true));
 }
-function speak(text){
-  if (!('speechSynthesis' in window)) return;
+function speak(text, then){
+  const clean = String(text).replace(/\s*\(offline mode\)/,'');
+  if (!('speechSynthesis' in window)){ if (then) then(); return; }
   speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(String(text).replace(/\s*\(offline mode\)/,''));
+  const u = new SpeechSynthesisUtterance(clean);
   u.lang = 'en-US'; u.rate = 1;
+  if (then){ u.onend = then; u.onerror = then; }
   speechSynthesis.speak(u);
+}
+
+/* Confirm one plan (used by taps and by voice). Stays in the chat so more requests can follow. */
+function confirmPlan(i){
+  const m = chat[i]; if (!m || m.status !== 'pending') return null;
+  lastBin = null;
+  const msgs = m.plan.map(applyAction); m.status = 'done'; save(); refresh();
+  if (lastBin) toastUndo(msgs[0], lastBin); else toast(msgs[0]);
+  return msgs.join('. ');
+}
+function cancelPlan(i){ const m = chat[i]; if (m && m.status === 'pending'){ m.status = 'cancelled'; refresh(); } }
+function pendingMsgs(){ return chat.map((m,i) => ({m,i})).filter(x => x.m.plan && x.m.status === 'pending'); }
+const NUMBER_WORDS = [['one|first|1'],['two|second|2'],['three|third|3'],['four|fourth|4'],['five|fifth|5']];
+function pickNumber(said, n){
+  if (/\blast\b/.test(said)) return n - 1;
+  for (let k = 0; k < NUMBER_WORDS.length; k++){ if (new RegExp('\\b(' + NUMBER_WORDS[k][0] + ')\\b').test(said)) return k < n ? k : null; }
+  return null;
+}
+/* Voice confirmation: reads the plan back and listens for yes or no */
+function voiceReply(r){
+  voicePick = null;
+  if (!r.actions.length) return speak(r.reply);
+  const pend = pendingMsgs();
+  if (pend.length > 1) return speak(`${r.reply} You have ${pend.length} requests waiting. Say a number and yes or no, or say yes to add them all.`, () => listen(handleVoiceConfirm));
+  const plan = r.actions.map(describe).join('. ');
+  speak(`${r.reply} ${plan}. Say yes to add it, or no to cancel.`, () => listen(handleVoiceConfirm));
+}
+function handleVoiceConfirm(said){
+  const pend = pendingMsgs();
+  if (!pend.length) return speak('Nothing is waiting for confirmation.');
+  const yes = /\b(yes|yeah|yep|yup|confirm|confirmed|ok|okay|sure|go ahead|do it|add it|all)\b/.test(said);
+  const no = /\b(no|nope|cancel|don't|dont|stop|skip)\b/.test(said);
+  const again = () => listen(handleVoiceConfirm);
+  if (pend.length > 1 && /\ball\b/.test(said) && (yes || no)){
+    pend.forEach(p => yes ? confirmPlan(p.i) : cancelPlan(p.i));
+    voicePick = null;
+    return speak(yes ? `Added ${pend.length} requests.` : 'Cancelled them all.');
+  }
+  if (pend.length === 1){
+    if (yes){ const t = confirmPlan(pend[0].i); return speak(t || 'Added.'); }
+    if (no){ cancelPlan(pend[0].i); return speak('Cancelled.'); }
+    return speak('Sorry, say yes to add it or no to cancel.', again);
+  }
+  const num = pickNumber(said, pend.length);
+  if (num !== null){
+    const target = pend[num];
+    if (yes){ voicePick = null; const t = confirmPlan(target.i); return speak(t || 'Added.'); }
+    if (no){ voicePick = null; cancelPlan(target.i); return speak('Cancelled.'); }
+    voicePick = num;
+    return speak(`Number ${num+1}: ${describe(target.m.plan[0])}. Say yes or no.`, again);
+  }
+  if (voicePick !== null && (yes || no)){
+    const target = pend[voicePick]; voicePick = null;
+    if (!target) return speak('That request is gone.');
+    if (yes){ const t = confirmPlan(target.i); return speak(t || 'Added.'); }
+    cancelPlan(target.i); return speak('Cancelled.');
+  }
+  const list = pend.map((p,k) => `${k+1}, ${describe(p.m.plan[0])}`).join('. ');
+  speak(`Which one? ${list}. Say the number, then yes or no.`, again);
 }
 
 function showChat(){ if (sheet && sheet.type==='chat') renderSheet(); else openSheet({type:'chat'}); }
@@ -1008,25 +1386,82 @@ async function act(name, ds){
       return render();
     }
     case 'sheet-spaces': return openSheet({type:'spaces'});
+    case 'sheet-rename': return openSheet({type:'rename', err:''});
+    case 'save-rename': {
+      const s = sheet, L = lsJSON(KLABELS) || {};
+      const val = k => String(s['lbl_'+k] !== undefined ? s['lbl_'+k] : SPACES[k].label).trim().slice(0,20);
+      if (ORDER.some(k => !val(k))){ s.err='Each space needs a name.'; return renderSheet(); }
+      const names = ORDER.map(k => val(k).toLowerCase());
+      if (new Set(names).size !== names.length){ s.err='Two spaces cannot have the same name.'; return renderSheet(); }
+      ORDER.forEach(k => { SPACES[k].label = val(k); L[k] = val(k); });
+      lsSet(KLABELS, JSON.stringify(L)); closeSheet(); render(); return toast('Space names updated');
+    }
+    case 'edit-section': { const l = S.checklists.find(x=>x.id===ds.l); if (l) openSheet({type:'edit-section', l:l.id, title:l.title, kind:l.recurring===false?'oneoff':'recurring', err:''}); return; }
+    case 'save-section': {
+      const s = sheet, t = (s.title||'').trim();
+      if (!t){ s.err='Give the section a name.'; return renderSheet(); }
+      const l = S.checklists.find(x=>x.id===s.l); if (l){ l.title = t.slice(0,40); if (s.kind) l.recurring = s.kind === 'recurring'; }
+      save(); closeSheet(); render(); return toast('Section saved');
+    }
+    case 'edit-event': { const e = S.events.find(x=>x.id===ds.id); if (e) openSheet({type:'edit-event', id:e.id, title:e.title, day:e.day, time:e.time, end:e.end||'', space:e.space, remind:e.remind==null?'none':String(e.remind), err:''}); return; }
+    case 'save-event': {
+      const s = sheet, e = S.events.find(x=>x.id===s.id), t = (s.title||'').trim();
+      if (!t){ s.err='Give it a title.'; return renderSheet(); }
+      if (!isIso(s.day)){ s.err='Pick a valid date.'; return renderSheet(); }
+      if (!TIME_OK.test(s.time||'')){ s.err='Pick a valid time.'; return renderSheet(); }
+      if (s.end && (!TIME_OK.test(s.end) || s.end <= s.time)){ s.err='End time must be after the start.'; return renderSheet(); }
+      if (e){ e.title = t.slice(0,60); e.day = s.day; e.time = s.time; e.end = s.end || undefined; e.space = s.space; e.remind = remindVal(s.remind); }
+      save(); closeSheet(); calDay = s.day; render(); return toast('Calendar item saved');
+    }
+    case 'edit-item': {
+      const l = S.checklists.find(x=>x.id===ds.l); const it = l && l.items[+ds.i]; if (!it) return;
+      openSheet({type:'edit-item', l:l.id, i:+ds.i, text:it.t, to:l.id, day:it.day||'', time:it.time||'', remind:it.remind==null?'none':String(it.remind), err:''}); return;
+    }
+    case 'edit-todo': { const t = S.todos.find(x=>x.id===ds.id); if (t) openSheet({type:'edit-todo', id:t.id, text:t.text, day:t.day||'', time:t.time||'', remind:t.remind==null?'none':String(t.remind), err:''}); return; }
+    case 'save-todo': {
+      const s = sheet, t = S.todos.find(x=>x.id===s.id), txt = (s.text||'').trim();
+      if (!txt){ s.err='Enter the task.'; return renderSheet(); }
+      const w = whenOf(s); if (w.err){ s.err = w.err; return renderSheet(); }
+      if (t){ t.text = txt.slice(0,120); Object.assign(t, w); }
+      save(); closeSheet(); render(); return toast('Task saved');
+    }
+    case 'save-item': {
+      const s = sheet, t = (s.text||'').trim();
+      if (!t){ s.err='Enter the task.'; return renderSheet(); }
+      const from = S.checklists.find(x=>x.id===s.l), to = S.checklists.find(x=>x.id===s.to) || from;
+      const item = from && from.items[s.i];
+      const w = whenOf(s); if (w.err){ s.err = w.err; return renderSheet(); }
+      if (item){ item.t = t.slice(0,120); Object.assign(item, w); if (to !== from){ from.items.splice(s.i,1); to.items.push(item); } }
+      save(); closeSheet(); render(); return toast('Task saved');
+    }
     case 'lens': { LENS[ds.w] = ds.v; return render(); }
     case 'send': return send();
     case 'suggest': return send(ds.t);
-    case 'plan-ok': {
-      const m = chat[+ds.m]; if (!m || m.status!=='pending') return;
-      const msgs = m.plan.map(applyAction); m.status='done'; save(); refresh(); return toast(msgs[0]);
-    }
-    case 'plan-no': { const m = chat[+ds.m]; if (m && m.status==='pending') m.status='cancelled'; return refresh(); }
+    case 'plan-ok': { confirmPlan(+ds.m); return; }
+    case 'plan-no': { cancelPlan(+ds.m); return; }
     case 'pick-day': calDay = ds.d; return render();
-    case 'del-event': S.events = S.events.filter(e=>e.id!==ds.id); save(); render(); return toast('Removed from calendar');
+    case 'del-event': { const e = S.events.find(x=>x.id===ds.id); if (!e) return; const id = bin('event', e, e.title); S.events = S.events.filter(x=>x.id!==ds.id); save(); if (sheet && sheet.type!=='chat') closeSheet(); render(); return toastUndo('Removed from calendar', id); }
+    case 'restore': return restoreBin(ds.id);
+    case 'allow-notify': { if ('Notification' in window) Notification.requestPermission().then(() => render()); return; }
     case 'todo': { const t = S.todos.find(x=>x.id===ds.id); if (t){ t.done=!t.done; save(); render(); if (t.done) toast('Task done'); } return; }
-    case 'del-todo': S.todos = S.todos.filter(t=>t.id!==ds.id); save(); render(); return toast('Task deleted');
-    case 'del-section': { const l = S.checklists.find(x=>x.id===ds.l); if (l && confirm(`Delete the section "${l.title}" and its ${l.items.length} item(s)?`)){ S.checklists = S.checklists.filter(x=>x.id!==ds.l); save(); render(); toast('Section deleted'); } return; }
-    case 'del-item': { const l = S.checklists.find(x=>x.id===ds.l); if (l){ l.items.splice(+ds.i,1); save(); render(); toast('Item removed'); } return; }
+    case 'del-todo': { const t = S.todos.find(x=>x.id===ds.id); if (!t) return; const id = bin('todo', t, t.text); S.todos = S.todos.filter(x=>x.id!==ds.id); save(); if (sheet && sheet.type!=='chat') closeSheet(); render(); return toastUndo('Task deleted', id); }
+    case 'arm-del-section': { if (sheet){ sheet.armed = true; renderSheet(); } return; }
+    case 'del-section': {
+      const l = S.checklists.find(x=>x.id===ds.l); if (!l) return;
+      const id = bin('section', l, l.title);
+      S.checklists = S.checklists.filter(x=>x.id!==ds.l); save();
+      closeSheet(); render(); return toastUndo(`Deleted ${l.title}`, id);
+    }
+    case 'del-item': {
+      const l = S.checklists.find(x=>x.id===ds.l); const item = l && l.items[+ds.i]; if (!item) return;
+      const id = bin('item', {section:{id:l.id, space:l.space, title:l.title, recurring:l.recurring}, index:+ds.i, item}, item.t);
+      l.items.splice(+ds.i,1); save(); if (sheet && sheet.type!=='chat') closeSheet(); render(); return toastUndo('Task removed', id);
+    }
     case 'item': { const l = S.checklists.find(x=>x.id===ds.l); if (l){ const it = l.items[+ds.i]; it.d=!it.d; save(); render(); } return; }
     case 'filter': postFilter = ds.f; return render();
     case 'schedule': { const p = S.posts.find(x=>x.id===ds.id); if (p){ p.status='Scheduled'; save(); render(); toast('Post scheduled'); } return; }
     case 'posted': { const p = S.posts.find(x=>x.id===ds.id); if (p){ p.status='Posted'; p.when='Marked as posted (demo, not sent)'; save(); render(); toast('Marked as posted'); } return; }
-    case 'del-post': S.posts = S.posts.filter(p=>p.id!==ds.id); save(); render(); return toast('Post deleted');
+    case 'del-post': { const p = S.posts.find(x=>x.id===ds.id); if (!p) return; const id = bin('post', p, (p.caption||'Post').slice(0,40)); S.posts = S.posts.filter(x=>x.id!==ds.id); save(); render(); return toastUndo('Post deleted', id); }
     case 'cal': S.sync.cals[+ds.i].on = !S.sync.cals[+ds.i].on; save(); return render();
     case 'twoway': S.sync.twoWay = !S.sync.twoWay; save(); return render();
     case 'reset': S = seedAll(); chat = [{who:'bot',text:helloText()}]; calDay = TODAY; postFilter='all'; save(); render(); return toast('Demo data reset');
@@ -1061,32 +1496,37 @@ async function act(name, ds){
     case 'do-event': {
       const s = sheet;
       if (!s.title.trim()){ s.err='Enter what is happening.'; return renderSheet(); }
-      S.events.push({id:uid(),space:s.space,day:s.day,time:s.time,title:s.title.trim(),kind:KIND[s.space],vis:s.vis||'busy'});
+      if (!TIME_OK.test(s.time||'')){ s.err='Pick a valid start time.'; return renderSheet(); }
+      if (s.end && (!TIME_OK.test(s.end) || s.end <= s.time)){ s.err='End time must be after the start.'; return renderSheet(); }
+      S.events.push({id:uid(),space:s.space,day:s.day,time:s.time,end:s.end||undefined,title:s.title.trim(),kind:KIND[s.space],vis:s.vis||'busy',remind:remindVal(s.remind)});
       save(); closeSheet(); calDay = s.day; render(); return toast(`Added to ${fullDate(s.day)}`);
     }
     case 'do-block': {
       const s = sheet;
-      S.events.push({id:uid(),space:s.space,day:s.day,time:s.time,title:s.title.trim()||'Blocked time',kind:'Block',vis:s.vis||'busy'});
-      save(); closeSheet(); calDay = s.day; render(); return toast(`Blocked ${fullDate(s.day)} ${s.time} in ${nm(s.space)}`);
+      if (!TIME_OK.test(s.time||'')){ s.err='Pick a valid start time.'; return renderSheet(); }
+      if (s.end && (!TIME_OK.test(s.end) || s.end <= s.time)){ s.err='End time must be after the start.'; return renderSheet(); }
+      S.events.push({id:uid(),space:s.space,day:s.day,time:s.time,end:s.end||undefined,title:s.title.trim()||'Blocked time',kind:'Block',vis:s.vis||'busy'});
+      save(); closeSheet(); calDay = s.day; render(); return toast(`Blocked ${fullDate(s.day)} ${s.time}${s.end?'–'+s.end:''} in ${nm(s.space)}`);
     }
     case 'do-task': {
       const s = sheet;
       const isRec = s.kind === 'recurring';
       const cur = s.section !== undefined ? s.section : (isRec ? (taskSections(s.space, true)[0] ? taskSections(s.space, true)[0].id : 'new') : '');
       if (!s.text.trim()){ s.err='Enter a task.'; return renderSheet(); }
+      const w = whenOf(s); if (w.err){ s.err = w.err; return renderSheet(); }
       if (cur === 'new'){
         const name = (s.newSection||'').trim();
         if (!name){ s.err='Name the new section.'; return renderSheet(); }
-        S.checklists.push({id:uid(), space:s.space, title:name.slice(0,40), items:[{t:s.text.trim(), d:false}], recurring:isRec});
+        S.checklists.push({id:uid(), space:s.space, title:name.slice(0,40), items:[{t:s.text.trim(), d:false, ...w}], recurring:isRec});
         save(); closeSheet(); render(); return toast(`Added to ${name}`);
       }
       if (cur){
         const l = S.checklists.find(x => x.id === cur);
         if (!l){ s.err='That section no longer exists.'; return renderSheet(); }
-        l.items.push({t:s.text.trim(), d:false});
+        l.items.push({t:s.text.trim(), d:false, ...w});
         save(); closeSheet(); render(); return toast(`Added to ${l.title}`);
       }
-      S.todos.push({id:uid(),space:s.space,text:s.text.trim(),done:false,due:s.due});
+      S.todos.push({id:uid(),space:s.space,text:s.text.trim(),done:false,due:s.due,...w});
       save(); closeSheet(); render(); return toast('Task added');
     }
 
@@ -1178,6 +1618,9 @@ if ('serviceWorker' in navigator && location.protocol==='https:' && !/claude\.ai
 }
 
 render();
+
+setInterval(checkReminders, 30000);
+checkReminders();
 </script>
 </body>
 </html>
