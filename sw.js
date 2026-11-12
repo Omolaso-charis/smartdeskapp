@@ -1,4 +1,4 @@
-const CACHE = 'smartdesk-v3-1';
+const CACHE = 'smartdesk-v4';
 const SHELL = ['./','./index.html','./manifest.json','./favicon.svg','./icon-180.png','./icon-192.png','./icon-512.png','./icon-maskable-512.png','./favicon-32.png'];
 self.addEventListener('install', e => { e.waitUntil(caches.open(CACHE).then(c => c.addAll(SHELL))); self.skipWaiting(); });
 self.addEventListener('activate', e => {
